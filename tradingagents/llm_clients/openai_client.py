@@ -67,6 +67,38 @@ class LocalCompatibleChatOpenAI(NormalizedChatOpenAI):
             kwargs.setdefault("tool_choice", None)
         return super().with_structured_output(schema, method=method, **kwargs)
 
+    def with_structured_output(self, schema, *, method=None, **kwargs):
+        resolved = method or get_capabilities(self.model_name).preferred_structured_method
+        if resolved == "function_calling":
+            kwargs.setdefault("tool_choice", None)
+        return super().with_structured_output(schema, method=method, **kwargs)
+
+
+class OpenCodeChatOpenAI(NormalizedChatOpenAI):
+    """OpenCode Go (https://opencode.ai/zen/go/v1) requires a stable
+    ``x-opencode-session`` header per conversation for routing + prompt caching,
+    plus a client-style User-Agent (generic HTTP-library UAs get 403'd at their
+    edge). This chat class injects both automatically (#opencode).
+    """
+
+    def _og_headers(self):
+        import uuid as _uuid
+        return {
+            "x-opencode-session": os.environ.get(
+                "OPENCODE_SESSION_ID",
+                getattr(self, "_opencode_session", None) or str(_uuid.uuid4()),
+            ),
+            "User-Agent": "TradingAgents/1.0",
+        }
+
+    def _generate(self, *args, **kwargs):
+        kwargs.setdefault("extra_headers", self._og_headers())
+        return super()._generate(*args, **kwargs)
+
+    async def _agenerate(self, *args, **kwargs):
+        kwargs.setdefault("extra_headers", self._og_headers())
+        return await super()._agenerate(*args, **kwargs)
+
 
 def _input_to_messages(input_: Any) -> list:
     """Normalise a langchain LLM input to a list of message objects.
@@ -216,10 +248,14 @@ OPENAI_COMPATIBLE_PROVIDERS: dict[str, ProviderSpec] = {
     "qwen":       ProviderSpec(base_url="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"),
     "qwen-cn":    ProviderSpec(base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"),
     "glm":        ProviderSpec(base_url="https://api.z.ai/api/paas/v4/"),
+    "zai":        ProviderSpec(base_url="https://api.z.ai/api/coding/paas/v4"),  # z.ai coding plan
     "glm-cn":     ProviderSpec(base_url="https://open.bigmodel.cn/api/paas/v4/"),
     "minimax":    ProviderSpec(base_url="https://api.minimax.io/v1", chat_class=MinimaxChatOpenAI),
     "minimax-cn": ProviderSpec(base_url="https://api.minimaxi.com/v1", chat_class=MinimaxChatOpenAI),
     "openrouter": ProviderSpec(base_url="https://openrouter.ai/api/v1"),
+    "opencode":   ProviderSpec(base_url="https://opencode.ai/zen/go/v1",
+                               base_url_env="OPENCODE_BASE_URL",
+                               chat_class=OpenCodeChatOpenAI),
     "mistral":    ProviderSpec(base_url="https://api.mistral.ai/v1"),
     "kimi":       ProviderSpec(base_url="https://api.moonshot.ai/v1"),
     "groq":       ProviderSpec(base_url="https://api.groq.com/openai/v1"),

@@ -91,7 +91,7 @@ TOOLS_CATEGORIES = {
 # sentinel instead of aborting the run (a bad LLM-supplied indicator, a missing
 # key, or a network blip should not crash an analysis over flavour data). Core
 # categories (prices, fundamentals, news) still raise so a broken primary is loud.
-OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
+OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets", "news_data", "core_stock_apis", "technical_indicators"}  # news/stock/indicator degrade to DATA_UNAVAILABLE (FX pairs stall Yahoo, AV unkeyed)
 
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
